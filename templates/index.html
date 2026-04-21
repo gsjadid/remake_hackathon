@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZEISS · Energy Atlas</title>
+<meta name="description" content="ZEISS Workflow Energy Intelligence — identify microscopy energy waste with hybrid AI." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          zeiss:      '#00B4F0',
+          'zeiss-2':  '#7DD3FC',
+          spike:      '#F43F5E',
+          warn:       '#F59E0B',
+          ok:         '#10B981',
+          ink:        '#0B0F1A',
+          'ink-2':    '#111827',
+          'ink-3':    '#1F2937',
+          'ink-4':    '#374151',
+        },
+        boxShadow: {
+          'glow-zeiss': '0 0 0 1px rgba(0,180,240,.35), 0 8px 32px -8px rgba(0,180,240,.35)',
+          'soft':       '0 1px 2px rgba(0,0,0,.04), 0 8px 24px -8px rgba(0,0,0,.08)',
+        },
+      }
+    }
+  }
+</script>
+<style>
+  :root {
+    --bg:        #F7F8FA;
+    --surface:   #FFFFFF;
+    --surface-2: #F1F5F9;
+    --border:    #E5E7EB;
+    --border-2:  #CBD5E1;
+    --text:      #0F172A;
+    --text-2:    #475569;
+    --text-3:    #94A3B8;
+    --zeiss:     #0091D5;
+    --ok:        #059669;
+    --warn:      #D97706;
+    --spike:     #DC2626;
+    --grid:      rgba(15, 23, 42, .04);
+  }
+  html.dark {
+    --bg:        #060913;
+    --surface:   rgba(17, 24, 39, .72);
+    --surface-2: rgba(31, 41, 55, .5);
+    --border:    rgba(148, 163, 184, .12);
+    --border-2:  rgba(148, 163, 184, .24);
+    --text:      #F1F5F9;
+    --text-2:    #9AA4B2;
+    --text-3:    #64748B;
+    --zeiss:     #00B4F0;
+    --ok:        #34D399;
+    --warn:      #FBBF24;
+    --spike:     #FB7185;
+    --grid:      rgba(148, 163, 184, .06);
+  }
+
+  * { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  html, body { background: var(--bg); color: var(--text); }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* ── Ambient background (dark mode aurora) ───────────────────────────── */
+  .aurora {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .aurora::before, .aurora::after {
+    content: ''; position: absolute; border-radius: 50%;
+    filter: blur(120px); opacity: .5; transition: opacity .8s;
+  }
+  .aurora::before {
+    width: 520px; height: 520px; top: -160px; left: -120px;
+    background: radial-gradient(circle, #00B4F0 0%, transparent 70%);
+  }
+  .aurora::after {
+    width: 420px; height: 420px; bottom: -120px; right: -80px;
+    background: radial-gradient(circle, #7C3AED 0%, transparent 70%);
+    opacity: .28;
+  }
+  html:not(.dark) .aurora::before { opacity: .12; }
+  html:not(.dark) .aurora::after  { opacity: .08; }
+
+  /* Grid backdrop */
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at 50% 0%, black 40%, transparent 85%);
+  }
+
+  /* ── Surface cards ───────────────────────────────────────────────────── */
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+  .surface-2 {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .divider { background: var(--border); }
+
+  /* ── Typography helpers ──────────────────────────────────────────────── */
+  .t-label { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .t-muted { color: var(--text-2); }
+  .t-faint { color: var(--text-3); }
+  .t-mono  { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  /* ── Pills / badges ─────────────────────────────────────────────────── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--border-2);
+  }
+  .pill-spike { background: rgba(244,63,94,.10);  color: var(--spike); border-color: rgba(244,63,94,.25); }
+  .pill-warn  { background: rgba(245,158,11,.10); color: var(--warn);  border-color: rgba(245,158,11,.25); }
+  .pill-ok    { background: rgba(16,185,129,.10); color: var(--ok);    border-color: rgba(16,185,129,.25); }
+  .pill-info  { background: rgba(0,180,240,.10);  color: var(--zeiss); border-color: rgba(0,180,240,.25); }
+  .pill-ghost { background: transparent; color: var(--text-2); }
+
+  /* ── Buttons ────────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+    border-radius: 8px; border: 1px solid var(--border-2);
+    color: var(--text); background: var(--surface);
+    transition: transform .08s, box-shadow .15s, background .15s, border-color .15s;
+    cursor: pointer; user-select: none;
+  }
+  .btn:hover { border-color: var(--zeiss); color: var(--zeiss); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: linear-gradient(135deg, #00B4F0 0%, #0091D5 100%);
+    color: white; border-color: transparent;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 20px -6px rgba(0,180,240,.5);
+  }
+  .btn-primary:hover { color: white; border-color: transparent; filter: brightness(1.08); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--text); border-color: transparent; }
+  .btn-sm { padding: 5px 10px; font-size: 11.5px; }
+  .btn-icon { padding: 7px; }
+  .btn[aria-pressed="true"] { background: rgba(0,180,240,.12); color: var(--zeiss); border-color: rgba(0,180,240,.4); }
+
+  /* ── Focus ring ────────────────────────────────────────────────────── */
+  :focus-visible { outline: 2px solid var(--zeiss); outline-offset: 2px; border-radius: 6px; }
+
+  /* ── Scrollbars ─────────────────────────────────────────────────────── */
+  .scroll-y::-webkit-scrollbar { width: 6px; }
+  .scroll-y::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+  .scroll-y::-webkit-scrollbar-thumb:hover { background: var(--zeiss); }
+
+  /* ── Hero orb ───────────────────────────────────────────────────────── */
+  .hero-orb {
+    width: 360px; height: 360px;
+    background: conic-gradient(from 120deg, #00B4F0, #7C3AED, #F43F5E, #00B4F0);
+    border-radius: 50%;
+    filter: blur(60px) saturate(180%);
+    opacity: .35;
+    animation: spin-slow 22s linear infinite;
+  }
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: .8; } 50% { opacity: .3; } }
+  .pulse-dot { animation: pulse 1.6s ease-in-out infinite; }
+
+  /* ── Waveform bars ─────────────────────────────────────────────────── */
+  .wave-container { position: relative; height: 72px; }
+  .wave-bar {
+    position: absolute; bottom: 0;
+    transition: transform .15s, opacity .2s, filter .15s;
+    cursor: pointer;
+    border-radius: 2px 2px 0 0;
+  }
+  .wave-bar:hover { transform: scaleY(1.06) translateY(-1px); filter: brightness(1.15); }
+  .wave-bar.active {
+    box-shadow: 0 0 0 1.5px var(--zeiss), 0 0 16px rgba(0,180,240,.4);
+    z-index: 5;
+    filter: brightness(1.25) saturate(1.2);
+  }
+  .wave-phase-strip { height: 18px; display: flex; border-radius: 6px; overflow: hidden; }
+  .wave-phase-strip > div { transition: filter .15s; }
+  .wave-phase-strip > div:hover { filter: brightness(1.15); }
+  .wave-axis-tick { font-size: 10px; color: var(--text-3); }
+
+  /* ── Segment card ────────────────────────────────────────────────── */
+  .seg-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .08s;
+    position: relative;
+  }
+  .seg-card::before {
+    content: ''; position: absolute; left: 0; top: 10px; bottom: 10px;
+    width: 3px; border-radius: 2px; background: var(--border-2);
+  }
+  .seg-card.seg-spike::before { background: var(--spike); }
+  .seg-card.seg-warn::before  { background: var(--warn); }
+  .seg-card.seg-ok::before    { background: var(--ok); }
+  .seg-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+  .seg-card.active {
+    box-shadow: 0 0 0 1.5px var(--zeiss), 0 6px 20px -8px rgba(0,180,240,.35);
+    border-color: transparent;
+  }
+  .seg-card.collapsed .seg-details { display: none; }
+
+  /* action badge */
+  .act {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+    padding: 3px 9px; border-radius: 4px; text-transform: uppercase;
+    border: 1px solid transparent;
+  }
+  .act-spike { background: rgba(244,63,94,.12);  color: var(--spike); border-color: rgba(244,63,94,.25); }
+  .act-warn  { background: rgba(245,158,11,.12); color: var(--warn);  border-color: rgba(245,158,11,.28); }
+  .act-ok    { background: rgba(16,185,129,.12); color: var(--ok);    border-color: rgba(16,185,129,.28); }
+
+  /* ── Phase divider ─────────────────────────────────────────────────── */
+  .phase-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 14px 0 10px; font-size: 11px; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .phase-divider .line { flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Upload dropzone ───────────────────────────────────────────────── */
+  .dropzone {
+    border: 1.5px dashed var(--border-2);
+    border-radius: 12px; padding: 36px 24px; text-align: center;
+    transition: border-color .2s, background .2s;
+    cursor: pointer;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--zeiss); background: rgba(0,180,240,.05); }
+
+  /* ── Spinner ────────────────────────────────────────────────────────── */
+  .spinner {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--border-2); border-top-color: var(--zeiss);
+    animation: spin .7s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Skeleton ──────────────────────────────────────────────────────── */
+  .skel {
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%);
+    background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 4px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ── Tab nav ───────────────────────────────────────────────────────── */
+  .tab {
+    padding: 7px 12px; font-size: 11.5px; font-weight: 600;
+    color: var(--text-2); cursor: pointer; border-radius: 6px;
+    transition: background .12s, color .12s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { color: var(--zeiss); background: rgba(0,180,240,.1); }
+
+  /* ── Chart helpers ────────────────────────────────────────────────── */
+  .meter { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .meter > div { height: 100%; border-radius: 3px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+
+  /* ── Toast ─────────────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%);
+    background: var(--ink-2); color: #F1F5F9; font-size: 13px; font-weight: 500;
+    padding: 10px 16px; border-radius: 8px;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,.5);
+    transition: transform .35s cubic-bezier(.2,.8,.2,1); z-index: 100;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Kbd hint ──────────────────────────────────────────────────────── */
+  .kbd {
+    display: inline-block; min-width: 18px; text-align: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    padding: 1.5px 5px; border-radius: 4px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-2);
+  }
+
+  /* ── Fixed chrome offsets ────────────────────────────────────────────
+     Nav: 56px  |  Toolbar: 48px  |  Wave-band: ~144px  =>  248px total
+  ─────────────────────────────────────────────────────────────────── */
+  body                  { padding-top: 3.5rem; }          /* pre-results: nav only */
+  body.view-results     { padding-top: 248px; }           /* results: nav+toolbar+wave */
+  #wave-band            { display: none; }                /* hidden until results */
+  body.view-results #wave-band { display: block; }        /* show with results */
+  #wave-band .wave-container { height: 56px; }            /* compact in fixed band */
+
+  /* ── Right inspector sticky ───────────────────────────────────────── */
+  .inspector { position: sticky; top: 248px; max-height: calc(100vh - 264px); overflow-y: auto; }
+
+  /* Hide pre-analysis sections after upload */
+  .view-results #hero-view, .view-results #upload-section { display: none !important; }
+  .view-results #results-view { display: block !important; }
+  .view-results #sticky-toolbar { display: flex !important; }
+  #results-view { display: none; }
+  #sticky-toolbar { display: none; }
+
+  /* Fade-in */
+  .fade-in { animation: fadeIn .35s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* Filter chip */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid transparent;
+    font-size: 11.5px; font-weight: 600; color: var(--text-2);
+    cursor: pointer; transition: all .15s;
+  }
+  .chip:hover { color: var(--text); }
+  .chip[aria-pressed="true"] {
+    background: rgba(0,180,240,.12); color: var(--zeiss);
+    border-color: rgba(0,180,240,.35);
+  }
+  .chip .count { font-size: 10px; opacity: .7; }
+
+  /* Demo scenario card */
+  .scenario-card {
+    text-align: left; padding: 14px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    transition: all .15s; cursor: pointer;
+  }
+  .scenario-card:hover {
+    border-color: var(--zeiss); transform: translateY(-2px);
+    box-shadow: 0 10px 24px -12px rgba(0,180,240,.3);
+  }
+  .scenario-card .tag {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; letter-spacing: .05em;
+    font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+
+<body class="min-h-screen relative">
+<div class="aurora" aria-hidden="true"></div>
+
+<!-- ═══ NAV ════════════════════════════════════════════════════════════════ -->
+<nav class="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 h-14 border-b" style="border-color:var(--border);background:var(--surface);backdrop-filter:blur(12px)">
+  <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-zeiss shadow-[0_0_12px_rgba(0,180,240,.7)]"></span>
+      <span class="font-700 text-[15px] tracking-tight">ZEISS</span>
+    </div>
+    <span class="t-faint text-sm">·</span>
+    <span class="text-[13px] font-500 t-muted tracking-wide">Energy Atlas</span>
+    <span id="model-chip" class="pill pill-info ml-2" title="Model status">
+      <span class="w-1.5 h-1.5 rounded-full bg-zeiss pulse-dot"></span>
+      <span id="model-chip-text">Initializing…</span>
+    </span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="help-btn" class="btn btn-ghost btn-sm" title="Keyboard shortcuts (?)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Shortcuts
+    </button>
+    <button id="theme-btn" class="btn btn-ghost btn-icon" title="Toggle theme" aria-label="Toggle theme">
+      <svg id="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg id="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+    <button id="upload-new-btn" class="btn btn-sm hidden">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      New analysis
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ STICKY TOOLBAR (post-analysis) ═══════════════════════════════════ -->
+<div id="sticky-toolbar" class="hidden fixed top-14 inset-x-0 z-40 items-center gap-3 px-6 h-12 border-b" style="border-color:var(--border);background:var(--surface);backdrop-filter:blur(12px)">
+  <button id="play-btn" class="btn btn-primary btn-sm" title="Play (Space)" aria-label="Play animation">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg>
+    Play
+  </button>
+  <button id="stop-btn" class="btn btn-sm hidden" title="Stop (Space)">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="3" height="8"/><rect x="6" y="1" width="3" height="8"/></svg>
+    Stop
+  </button>
+  <div class="h-5 w-px divider"></div>
+  <div id="toolbar-chips" class="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter segments"></div>
+  <div class="ml-auto flex items-center gap-2">
+    <span id="sb-scenario" class="t-faint text-xs t-mono"></span>
+    <div class="h-5 w-px divider"></div>
+    <button id="copy-report-btn" class="btn btn-ghost btn-sm" title="Copy summary to clipboard">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy summary
+    </button>
+    <button id="download-btn" class="btn btn-ghost btn-sm" title="Download JSON">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      JSON
+    </button>
+  </div>
+</div>
+
+<!-- ═══ WAVEFORM BAND (fixed, shown with results) ══════════════════════ -->
+<div id="wave-band" class="fixed inset-x-0 z-30 px-6 py-2 border-b" style="top:104px;border-color:var(--border);background:var(--surface);backdrop-filter:blur(12px)">
+  <div class="max-w-[1400px] mx-auto">
+    <div class="flex items-center justify-between mb-1">
+      <div class="t-label">Power over workflow</div>
+      <div class="flex items-center gap-3 t-faint text-[10.5px]">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm" style="background:var(--spike)"></span>Pause</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm" style="background:var(--warn)"></span>Optimize</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm" style="background:var(--ok)"></span>Efficient</span>
+      </div>
+    </div>
+    <div class="wave-phase-strip" id="wave-phases" aria-hidden="true"></div>
+    <div class="wave-container mt-1" id="wave-container" role="slider" aria-label="Workflow timeline"></div>
+    <div class="flex items-center justify-between mt-0.5">
+      <span class="wave-axis-tick" id="wave-start">0s</span>
+      <span class="wave-axis-tick t-muted" id="wave-now-label">—</span>
+      <span class="wave-axis-tick" id="wave-end">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HERO (pre-upload) ══════════════════════════════════════════════════ -->
+<main id="hero-view" class="relative z-10 px-6 pt-6 pb-10 max-w-6xl mx-auto">
+  <div class="absolute top-6 right-6 hero-orb pointer-events-none hidden md:block" aria-hidden="true"></div>
+
+  <div class="relative">
+    <div class="pill pill-info mb-4">
+      <span class="w-1.5 h-1.5 rounded-full bg-zeiss"></span>
+      Hybrid    
+    </div>
+    <h1 class="text-[44px] md:text-[56px] font-700 leading-[1.05] tracking-tight mb-4">
+      Find the <span class="bg-gradient-to-r from-zeiss via-zeiss-2 to-purple-400 bg-clip-text text-transparent">energy waste</span><br/>
+      hiding in your microscopy workflow.
+    </h1>
+    <p class="t-muted text-[15px] max-w-xl leading-relaxed">
+      Upload 15-second telemetry or pre-segmented CSV.
+      The Energy Atlas segments the run, flags energy spikes, and tells you what to do —
+      in plain English, with numbers that translate to real-world impact.
+    </p>
+  </div>
+</main>
+
+<!-- ═══ UPLOAD CARD ════════════════════════════════════════════════════════ -->
+<section id="upload-section" class="relative z-10 px-6 pb-16 max-w-6xl mx-auto">
+  <div class="surface shadow-soft p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-[13px] font-600">Upload your own workflow</h2>
+      <span class="t-faint text-[11px]">CSV · raw telemetry (15-sec rows) or pre-segmented</span>
+    </div>
+    <div id="upload-zone" class="dropzone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="event.preventDefault(); this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="handleDrop(event)">
+      <svg class="mx-auto mb-3" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3)"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+      <p class="text-[13px] font-500">Drag &amp; drop a CSV, or click to browse</p>
+      <p class="t-faint text-[11px] mt-1">Max ~50 MB. Telemetry is processed locally in this session.</p>
+    </div>
+    <input type="file" id="file-input" accept=".csv" class="hidden" onchange="handleFileSelect(event)" />
+
+    <div id="upload-status" class="hidden mt-4 flex items-center gap-2 text-[12.5px] t-muted">
+      <div class="spinner"></div>
+      <span id="upload-status-text">Analyzing workflow…</span>
+    </div>
+    <div id="upload-error" class="hidden mt-4 p-3 rounded text-[12.5px]" style="background:rgba(244,63,94,.08);color:var(--spike);border:1px solid rgba(244,63,94,.25)"></div>
+
+    <div class="mt-4 flex items-center gap-3 flex-wrap">
+      <button id="analyze-btn" class="btn btn-primary" onclick="runAnalysis()" disabled>
+        Analyze workflow
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+      <span id="selected-filename" class="text-[11.5px] t-muted truncate"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ RESULTS VIEW ══════════════════════════════════════════════════════ -->
+<section id="results-view" class="relative z-10 px-6 pb-16 max-w-[1400px] mx-auto fade-in">
+
+  <!-- ── Narrative banner + KPIs ───────────────────────────────────────── -->
+  <div class="surface shadow-soft p-5 mb-4">
+    <div class="flex items-start gap-4 flex-wrap">
+      <div class="flex-1 min-w-[280px]">
+        <div class="t-label mb-1">Verdict</div>
+        <h2 id="verdict-headline" class="text-[20px] md:text-[22px] font-700 leading-tight tracking-tight"></h2>
+        <p id="verdict-sub" class="t-muted text-[13px] mt-1 leading-snug"></p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
+        <div>
+          <div class="t-label mb-1">Total energy</div>
+          <div class="text-[20px] font-700 t-mono" id="kpi-total">—</div>
+          <div class="t-faint text-[10.5px]" id="kpi-total-sub">—</div>
+        </div>
+        <div>
+          <div class="t-label mb-1">Saveable</div>
+          <div class="text-[20px] font-700 t-mono" style="color:var(--ok)" id="kpi-saveable">—</div>
+          <div class="t-faint text-[10.5px]" id="kpi-saveable-sub">—</div>
+        </div>
+        <div>
+          <div class="t-label mb-1">Issues</div>
+          <div class="text-[20px] font-700 t-mono" id="kpi-issues">—</div>
+          <div class="t-faint text-[10.5px]" id="kpi-issues-sub">—</div>
+        </div>
+        <div>
+          <div class="t-label mb-1">Model F1</div>
+          <div class="text-[20px] font-700 t-mono" id="kpi-f1">—</div>
+          <div class="t-faint text-[10.5px]" id="kpi-f1-sub">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Body: 2-col ──────────────────────────────────────────────────── -->
+  <div class="flex gap-5 items-start flex-wrap xl:flex-nowrap">
+
+    <!-- LEFT: segments list -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-[12.5px] font-600">Workflow segments <span id="seg-count-label" class="t-faint font-400">(—)</span></h3>
+        <label class="flex items-center gap-2 text-[11px] t-muted cursor-pointer select-none">
+          <input type="checkbox" id="show-efficient" class="accent-zeiss" onchange="toggleEfficient(this.checked)" />
+          Expand efficient
+        </label>
+      </div>
+      <div id="segments-list" class="scroll-y pr-1"></div>
+      <div id="segments-empty" class="hidden surface p-8 text-center">
+        <div class="t-muted text-[13px] mb-1">No segments match this filter.</div>
+        <button class="btn btn-ghost btn-sm" onclick="setFilter('all')">Show all</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: inspector -->
+    <aside class="w-full xl:w-[340px] shrink-0 inspector scroll-y space-y-3">
+      <!-- Header -->
+      <div class="surface p-4">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="t-label mb-0.5">Selected</div>
+            <div id="rp-seg-id" class="text-[14.5px] font-700 t-mono">—</div>
+          </div>
+          <span id="rp-phase-badge"></span>
+        </div>
+        <div class="flex items-center gap-2 mt-3">
+          <button id="prev-seg" class="btn btn-sm btn-ghost" title="Previous (↑)"
+            aria-label="Previous segment">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button id="next-seg" class="btn btn-sm btn-ghost" title="Next (↓)"
+            aria-label="Next segment">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span id="rp-position" class="t-faint text-[11px] ml-auto t-mono">—</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="surface p-1 flex gap-1" role="tablist">
+        <div class="tab flex-1 text-center" role="tab" data-tab="metrics" aria-selected="true">Metrics</div>
+        <div class="tab flex-1 text-center" role="tab" data-tab="why">Why</div>
+        <div class="tab flex-1 text-center" role="tab" data-tab="impact">Impact</div>
+      </div>
+
+      <!-- Tab: Metrics -->
+      <div class="tab-pane" data-pane="metrics">
+        <div class="surface p-4">
+          <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div><div class="t-label">Avg power</div><div class="t-mono text-[14px] font-600" id="rp-power">—</div></div>
+            <div><div class="t-label">vs baseline</div><div class="t-mono text-[14px] font-600" id="rp-vs-baseline">—</div></div>
+            <div><div class="t-label">Duration</div><div class="t-mono text-[14px] font-600" id="rp-duration">—</div></div>
+            <div><div class="t-label">Energy</div><div class="t-mono text-[14px] font-600" id="rp-energy">—</div></div>
+            <div><div class="t-label">Live View</div><div class="t-mono text-[14px] font-600" id="rp-live-view">—</div></div>
+            <div><div class="t-label">User interact</div><div class="t-mono text-[14px] font-600" id="rp-user-int">—</div></div>
+            <div><div class="t-label">Tile overlap</div><div class="t-mono text-[14px] font-600" id="rp-overlap">—</div></div>
+            <div><div class="t-label">Monitoring</div><div class="t-mono text-[14px] font-600" id="rp-monitoring">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Why -->
+      <div class="tab-pane hidden" data-pane="why">
+        <div id="rp-issue-card" class="surface p-4 hidden">
+          <div class="t-label mb-1.5" style="color:var(--spike)">⚠ Issue detected</div>
+          <p id="rp-issue-text" class="text-[13px] leading-snug"></p>
+        </div>
+        <div id="rp-ok-card" class="surface p-4 hidden">
+          <div class="flex items-center gap-2">
+            <span style="color:var(--ok)">✓</span>
+            <span class="text-[13px] font-500">No issues detected — operating within efficient envelope.</span>
+          </div>
+        </div>
+        <div class="surface p-4 mt-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="t-label">Recommendation</div>
+            <span id="rp-action-badge"></span>
+          </div>
+          <p id="rp-reason" class="text-[13px] leading-snug mb-3">—</p>
+          <div class="t-label mb-1.5">Confidence</div>
+          <div class="meter"><div id="rp-conf-bar" style="width:0%;background:var(--zeiss)"></div></div>
+          <div class="flex justify-between mt-1">
+            <span class="t-faint text-[10.5px]" id="rp-confidence-text">—</span>
+            <span class="t-faint text-[10.5px]" id="rp-rule">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Impact -->
+      <div class="tab-pane hidden" data-pane="impact">
+        <div class="surface p-4">
+          <div class="t-label mb-1.5">Estimated savings</div>
+          <div id="rp-savings" class="text-[22px] font-700 t-mono" style="color:var(--ok)">—</div>
+          <div id="rp-savings-note" class="t-faint text-[11px] mt-0.5">—</div>
+          <div class="mt-4 t-label">Equivalent to</div>
+          <ul id="rp-impact-list" class="mt-2 space-y-2 text-[12px]"></ul>
+        </div>
+      </div>
+
+      <!-- Always-visible footer totals -->
+      <div class="surface p-4" style="background:var(--surface-2)">
+        <div class="t-label mb-3">Cumulative workflow</div>
+        <div class="space-y-2.5 text-[12px]">
+          <div class="flex items-center justify-between">
+            <span class="t-muted">Total energy</span>
+            <span class="t-mono font-600" id="ct-total-energy">—</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="t-muted">Potential savings</span>
+            <span class="t-mono font-600" style="color:var(--ok)" id="ct-savings">—</span>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="t-muted">Efficiency score</span>
+              <span class="t-mono font-600" id="ct-efficiency">—</span>
+            </div>
+            <div class="meter"><div id="ct-eff-bar" style="width:0%;background:var(--ok)"></div></div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="t-muted">Energy spikes</span>
+            <span class="t-mono font-600" style="color:var(--spike)" id="ct-spikes">—</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ═══ HELP PANEL ════════════════════════════════════════════════════════ -->
+<div id="help-overlay" class="fixed inset-0 z-[60] hidden items-center justify-center p-4" style="background:rgba(6,9,19,.72);backdrop-filter:blur(6px)">
+  <div class="surface p-6 max-w-md w-full shadow-soft">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-[16px] font-700">Keyboard shortcuts</h3>
+      <button class="btn btn-ghost btn-icon" onclick="toggleHelp(false)" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="space-y-2.5 text-[13px]">
+      <div class="flex items-center justify-between"><span class="t-muted">Next / previous segment</span><span class="flex gap-1"><span class="kbd">↑</span><span class="kbd">↓</span></span></div>
+      <div class="flex items-center justify-between"><span class="t-muted">Play / pause timeline</span><span class="kbd">Space</span></div>
+      <div class="flex items-center justify-between"><span class="t-muted">Inspector tabs</span><span class="flex gap-1"><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span></span></div>
+      <div class="flex items-center justify-between"><span class="t-muted">Filter: All / Issues / Spikes / OK</span><span class="flex gap-1"><span class="kbd">a</span><span class="kbd">i</span><span class="kbd">s</span><span class="kbd">o</span></span></div>
+      <div class="flex items-center justify-between"><span class="t-muted">Toggle theme</span><span class="kbd">t</span></div>
+      <div class="flex items-center justify-between"><span class="t-muted">Close dialog</span><span class="kbd">Esc</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ═════════════════════════════════════════════════════════════ -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════ -->
+<footer class="relative z-10 px-6 py-5 border-t text-[11px] t-faint flex items-center justify-between" style="border-color:var(--border)">
+  <span>© ZEISS Group · Energy Atlas</span>
+  <span class="t-mono">Kaput Team</span>
+</footer>
+
+<!-- ═══ SCRIPT ════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── State ────────────────────────────────────────────────────────────────
+let _data = null;
+let _activeIdx = 0;
+let _playInterval = null;
+let _selectedFile = null;
+let _filter = 'all';
+let _visibleIdx = [];   // indices passing current filter
+
+// ── Theme ────────────────────────────────────────────────────────────────
+function applyTheme(mode) {
+  document.documentElement.classList.toggle('dark', mode === 'dark');
+  document.getElementById('theme-icon-dark').classList.toggle('hidden', mode !== 'light');
+  document.getElementById('theme-icon-light').classList.toggle('hidden', mode === 'light');
+  localStorage.setItem('zeiss-theme', mode);
+}
+(() => {
+  const stored = localStorage.getItem('zeiss-theme');
+  applyTheme(stored || 'dark');
+})();
+document.getElementById('theme-btn').addEventListener('click', () => {
+  const isDark = document.documentElement.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+});
+
+// ── Health / model readiness ─────────────────────────────────────────────
+async function pollHealth() {
+  try {
+    const r = await fetch('/health');
+    const j = await r.json();
+    const chip = document.getElementById('model-chip');
+    const txt  = document.getElementById('model-chip-text');
+    if (j.model_ready) {
+      chip.classList.remove('pill-info');
+      chip.classList.add('pill-ok');
+      chip.querySelector('span').style.background = 'var(--ok)';
+      chip.querySelector('span').classList.remove('pulse-dot');
+      const acc = j.model_accuracy ? Math.round(j.model_accuracy * 100) : 0;
+      txt.textContent = `MLP ready · ${acc}% accuracy`;
+    } else {
+      txt.textContent = 'Training model…';
+      setTimeout(pollHealth, 2500);
+    }
+  } catch { setTimeout(pollHealth, 3500); }
+}
+pollHealth();
+
+// ── File handling ────────────────────────────────────────────────────────
+function handleFileSelect(e) { const f = e.target.files[0]; if (f) selectFile(f); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0]; if (f) selectFile(f);
+}
+function selectFile(f) {
+  _selectedFile = f;
+  document.getElementById('selected-filename').textContent = f.name;
+  document.getElementById('analyze-btn').disabled = false;
+  document.getElementById('upload-error').classList.add('hidden');
+}
+
+// ── Upload & analyze (custom file) ───────────────────────────────────────
+async function runAnalysis() {
+  if (!_selectedFile) return;
+  setUploadState('uploading');
+  const form = new FormData(); form.append('file', _selectedFile);
+  try {
+    const resp = await fetch('/analyze', { method: 'POST', body: form });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Analysis failed'); }
+    const data = await resp.json();
+    _data = data;
+    setUploadState('done');
+    renderResults(data);
+  } catch (e) { setUploadState('error', e.message); }
+}
+
+// ── Demo scenario ───────────────────────────────────────────────────────
+async function runScenario(name) {
+  setUploadState('uploading', `Loading scenario ${name}…`);
+  try {
+    const resp = await fetch('/analyze-sample?name=' + encodeURIComponent(name));
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Failed'); }
+    const data = await resp.json();
+    _data = data;
+    setUploadState('done');
+    renderResults(data);
+    toast(`Loaded demo scenario ${name}`);
+  } catch (e) { setUploadState('error', e.message); }
+}
+document.querySelectorAll('.scenario-card').forEach(c => {
+  c.addEventListener('click', () => runScenario(c.dataset.scenario));
+});
+
+function setUploadState(state, msg) {
+  const status = document.getElementById('upload-status');
+  const err = document.getElementById('upload-error');
+  const btn = document.getElementById('analyze-btn');
+  status.classList.add('hidden'); err.classList.add('hidden'); btn.disabled = false;
+  if (state === 'uploading') {
+    status.classList.remove('hidden'); btn.disabled = true;
+    document.getElementById('upload-status-text').textContent = msg || 'Analyzing workflow…';
+  } else if (state === 'error') {
+    err.textContent = '⚠ ' + (msg || 'Unknown error');
+    err.classList.remove('hidden');
+  } else if (state === 'done') {
+    document.body.classList.add('view-results');
+    document.getElementById('upload-new-btn').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// ── Reset ───────────────────────────────────────────────────────────────
+document.getElementById('upload-new-btn').addEventListener('click', () => {
+  stopPlay();
+  _data = null; _selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('selected-filename').textContent = '';
+  document.getElementById('analyze-btn').disabled = true;
+  document.body.classList.remove('view-results');
+  document.getElementById('upload-new-btn').classList.add('hidden');
+  document.getElementById('upload-error').classList.add('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ── Phase palette ───────────────────────────────────────────────────────
+const PHASE_ORDER  = ['tile_scan_acquisition', 'live_view_monitoring', 'processing', 'idle'];
+const PHASE_STYLES = {
+  tile_scan_acquisition: { col: '#F59E0B', label: 'Tile scan' },
+  processing:            { col: '#8B5CF6', label: 'Processing' },
+  live_view_monitoring:  { col: '#00B4F0', label: 'Live view' },
+  idle:                  { col: '#64748B', label: 'Idle' },
+};
+const phaseStyle = p => PHASE_STYLES[p] || { col: '#94A3B8', label: p || 'Unknown' };
+
+function actionColor(action) {
+  if (action === 'pause_live_view') return 'var(--spike)';
+  if (action === 'optimize_tile_scan_settings') return 'var(--warn)';
+  return 'var(--ok)';
+}
+function actionBadge(action) {
+  const m = {
+    pause_live_view:             ['act-spike', '⏸ Pause Live View'],
+    optimize_tile_scan_settings: ['act-warn',  '⚙ Optimize Tile Scan'],
+    no_action:                   ['act-ok',    '✓ Efficient'],
+  };
+  const [c, l] = m[action] || ['act-ok', action];
+  return `<span class="act ${c}">${l}</span>`;
+}
+
+// ── Impact translations ─────────────────────────────────────────────────
+// Relatable real-world equivalents for energy (Wh)
+function buildImpact(wh) {
+  if (!wh || wh <= 0) return [];
+  // Simple, defensible conversions (rounded):
+  //  - Smartphone full charge ≈ 15 Wh
+  //  - LED bulb (10 W) hours = wh / 10
+  //  - EV km @ 180 Wh/km = wh / 180
+  //  - Cup of coffee (drip, ~130 Wh electric brew)
+  //  - CO2: EU grid avg ~0.25 kg CO2 / kWh → wh * 0.00025 kg
+  const items = [
+    { icon: '📱', label: 'Smartphone charges',  val: wh / 15,   unit: '' },
+    { icon: '💡', label: 'LED-bulb hours (10 W)', val: wh / 10,   unit: ' h' },
+    { icon: '🚗', label: 'EV range',             val: wh / 180,  unit: ' km' },
+    { icon: '🌱', label: 'CO₂ avoided',          val: wh * 0.00025, unit: ' kg', precision: 3 },
+  ];
+  return items.filter(it => it.val >= (it.precision ? 0.001 : 0.05))
+              .map(it => ({ ...it, display: it.val.toFixed(it.precision ?? (it.val < 10 ? 1 : 0)) + it.unit }));
+}
+
+// ── Narrative headline ──────────────────────────────────────────────────
+function verdict(data) {
+  const pct = data.savings_pct || 0;
+  const segs = data.segments || [];
+  const pauseN = segs.filter(s => s.recommended_action === 'pause_live_view').length;
+  const optN   = segs.filter(s => s.recommended_action === 'optimize_tile_scan_settings').length;
+  const spikeN = data.spike_count || 0;
+
+  let headline, sub;
+  if (pct < 5) {
+    headline = `Efficient workflow — ${pct.toFixed(1)}% waste.`;
+    sub = `Operating within expected envelope across ${data.total_segments} segments. No major interventions needed.`;
+  } else if (pct < 15) {
+    headline = `Moderate waste — ${pct.toFixed(1)}% of energy is avoidable.`;
+    sub = `${data.issues_count} segment${data.issues_count !== 1 ? 's' : ''} flagged. Quick wins available.`;
+  } else {
+    headline = `Significant waste — ${pct.toFixed(1)}% of energy is avoidable.`;
+    const drivers = [];
+    if (pauseN) drivers.push(`${pauseN} Live View leak${pauseN > 1 ? 's' : ''}`);
+    if (optN)   drivers.push(`${optN} tile-scan over-spec'd`);
+    if (spikeN) drivers.push(`${spikeN} energy spike${spikeN > 1 ? 's' : ''}`);
+    sub = drivers.length
+      ? `Main drivers: ${drivers.join(' · ')}. See the highlighted segments below.`
+      : `Multiple segments flagged — review recommendations below.`;
+  }
+  const imp = buildImpact(data.total_savings_wh);
+  if (imp.length) sub += ` Saving it is worth ~${imp[0].display} ${imp[0].label.toLowerCase()}.`;
+  return { headline, sub };
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function renderResults(data) {
+  // Scenario
+  document.getElementById('sb-scenario').textContent = data.scenario_name || '';
+
+  // Verdict
+  const v = verdict(data);
+  document.getElementById('verdict-headline').textContent = v.headline;
+  document.getElementById('verdict-sub').textContent = v.sub;
+
+  // KPIs
+  const accPct = data.model_ready ? Math.round(data.model_accuracy * 100) : 0;
+  const f1Pct  = data.model_ready ? Math.round(data.model_f1 * 100)       : 0;
+  document.getElementById('kpi-total').textContent = data.total_energy_wh.toFixed(2) + ' Wh';
+  document.getElementById('kpi-total-sub').textContent = `${data.total_segments} segments`;
+  document.getElementById('kpi-saveable').textContent = '+' + data.total_savings_wh.toFixed(2) + ' Wh';
+  document.getElementById('kpi-saveable-sub').textContent = data.savings_pct.toFixed(1) + '% of total';
+  document.getElementById('kpi-issues').textContent = data.issues_count;
+  document.getElementById('kpi-issues-sub').textContent = `${data.spike_count} spike${data.spike_count !== 1 ? 's' : ''}`;
+  document.getElementById('kpi-f1').textContent = f1Pct + '%';
+  document.getElementById('kpi-f1-sub').textContent = `Accuracy ${accPct}%`;
+
+  // Cumulative
+  const totalWh = data.total_energy_wh || 1;
+  const effScore = Math.round((1 - data.total_savings_wh / totalWh) * 100);
+  document.getElementById('ct-total-energy').textContent = data.total_energy_wh.toFixed(2) + ' Wh';
+  document.getElementById('ct-savings').textContent = '+' + data.total_savings_wh.toFixed(2) + ' Wh';
+  document.getElementById('ct-efficiency').textContent = effScore + '%';
+  document.getElementById('ct-eff-bar').style.width = Math.max(0, Math.min(100, effScore)) + '%';
+  document.getElementById('ct-spikes').textContent = data.spike_count;
+
+  // Toolbar filter chips
+  renderFilterChips(data.segments);
+
+  // Waveform
+  renderWaveform(data.segments);
+
+  // Segments
+  renderSegments(data.segments);
+  applyFilter();
+
+  // First segment
+  activateSegment(_visibleIdx[0] ?? 0);
+}
+
+function renderFilterChips(segs) {
+  const counts = {
+    all:    segs.length,
+    issues: segs.filter(s => s.recommended_action !== 'no_action').length,
+    spikes: segs.filter(s => s.is_energy_spike).length,
+    ok:     segs.filter(s => s.recommended_action === 'no_action').length,
+  };
+  const base = [
+    ['all',    'All',       counts.all],
+    ['issues', 'Issues',    counts.issues],
+    ['spikes', 'Spikes',    counts.spikes],
+    ['ok',     'Efficient', counts.ok],
+  ];
+  const phaseCounts = {};
+  segs.forEach(s => { phaseCounts[s.phase] = (phaseCounts[s.phase] || 0) + 1; });
+  const wrap = document.getElementById('toolbar-chips');
+  wrap.innerHTML = '';
+  base.forEach(([k, lbl, n]) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.setAttribute('aria-pressed', _filter === k ? 'true' : 'false');
+    b.dataset.filter = k;
+    b.innerHTML = `${lbl}<span class="count">${n}</span>`;
+    b.onclick = () => setFilter(k);
+    wrap.appendChild(b);
+  });
+  const sep = document.createElement('span');
+  sep.className = 'h-4 w-px divider';
+  wrap.appendChild(sep);
+  PHASE_ORDER.forEach(p => {
+    if (!phaseCounts[p]) return;
+    const ps = phaseStyle(p);
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.setAttribute('aria-pressed', _filter === 'phase:' + p ? 'true' : 'false');
+    b.dataset.filter = 'phase:' + p;
+    b.innerHTML = `<span class="w-2 h-2 rounded-sm" style="background:${ps.col}"></span>${ps.label}<span class="count">${phaseCounts[p]}</span>`;
+    b.onclick = () => setFilter('phase:' + p);
+    wrap.appendChild(b);
+  });
+}
+
+function setFilter(f) {
+  _filter = f;
+  document.querySelectorAll('#toolbar-chips .chip').forEach(c => {
+    c.setAttribute('aria-pressed', c.dataset.filter === f ? 'true' : 'false');
+  });
+  applyFilter();
+}
+
+function applyFilter() {
+  if (!_data) return;
+  const segs = _data.segments;
+  _visibleIdx = [];
+  segs.forEach((s, i) => {
+    let ok;
+    if (_filter === 'all')     ok = true;
+    else if (_filter === 'issues') ok = s.recommended_action !== 'no_action';
+    else if (_filter === 'spikes') ok = s.is_energy_spike;
+    else if (_filter === 'ok')     ok = s.recommended_action === 'no_action';
+    else if (_filter.startsWith('phase:')) ok = s.phase === _filter.slice(6);
+    else ok = true;
+    const card = document.getElementById('seg-card-' + i);
+    if (card) card.style.display = ok ? '' : 'none';
+    if (ok) _visibleIdx.push(i);
+  });
+  // Hide phase-divider if all following segs until next divider are hidden
+  const list = document.getElementById('segments-list');
+  list.querySelectorAll('.phase-divider').forEach(div => {
+    let el = div.nextElementSibling, anyVisible = false;
+    while (el && !el.classList.contains('phase-divider')) {
+      if (el.classList.contains('seg-card') && el.style.display !== 'none') { anyVisible = true; break; }
+      el = el.nextElementSibling;
+    }
+    div.style.display = anyVisible ? '' : 'none';
+  });
+  document.getElementById('segments-empty').classList.toggle('hidden', _visibleIdx.length > 0);
+  document.getElementById('seg-count-label').textContent =
+    `(${_visibleIdx.length}${_visibleIdx.length !== segs.length ? ' of ' + segs.length : ''})`;
+  // If current active is filtered-out, jump to first visible
+  if (!_visibleIdx.includes(_activeIdx) && _visibleIdx.length) {
+    activateSegment(_visibleIdx[0]);
+  }
+}
+
+// ── Waveform ────────────────────────────────────────────────────────────
+function renderWaveform(segs) {
+  const totalDur = segs.reduce((s, r) => s + (r.duration_sec || 0), 0) || 1;
+  const maxPow   = Math.max(...segs.map(s => s.avg_power_w || 0), 1);
+
+  // Phase strip
+  const zones = [];
+  segs.forEach(s => {
+    const last = zones[zones.length - 1];
+    if (last && last.phase === s.phase) last.dur += s.duration_sec;
+    else zones.push({ phase: s.phase, dur: s.duration_sec });
+  });
+  const phaseEl = document.getElementById('wave-phases');
+  phaseEl.innerHTML = '';
+  zones.forEach(z => {
+    const pct = (z.dur / totalDur * 100).toFixed(3);
+    const ps  = phaseStyle(z.phase);
+    const el  = document.createElement('div');
+    el.style.cssText =
+      `width:${pct}%;background:${ps.col}22;border-right:1px solid ${ps.col}44;` +
+      `display:flex;align-items:center;justify-content:center;overflow:hidden;`;
+    el.title = ps.label;
+    if (parseFloat(pct) > 6) {
+      el.innerHTML = `<span style="font-size:9px;font-weight:700;color:${ps.col};` +
+        `text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;">${ps.label}</span>`;
+    }
+    phaseEl.appendChild(el);
+  });
+
+  // Power bars
+  const wave = document.getElementById('wave-container');
+  wave.innerHTML = '';
+  let cum = 0;
+  segs.forEach((s, i) => {
+    const leftPct = (cum / totalDur * 100);
+    const widthPct = Math.max(0.15, s.duration_sec / totalDur * 100);
+    cum += s.duration_sec;
+    const h = Math.max(6, (s.avg_power_w / maxPow) * 72);
+    const bar = document.createElement('div');
+    bar.className = 'wave-bar';
+    bar.id = 'wave-bar-' + i;
+    bar.style.cssText =
+      `left:${leftPct}%;width:calc(${widthPct}% - 1px);height:${h}px;` +
+      `background:${actionColor(s.recommended_action)};opacity:${s.recommended_action === 'no_action' ? .55 : .9};`;
+    bar.title = `${s.segment_id} · ${s.avg_power_w.toFixed(0)} W · ${s.duration_sec}s · ${phaseStyle(s.phase).label}`;
+    bar.addEventListener('click', () => jumpToSegment(i));
+    wave.appendChild(bar);
+  });
+
+  // Axis
+  document.getElementById('wave-end').textContent = fmtDuration(totalDur);
+}
+
+function updateWavePosition(idx) {
+  document.querySelectorAll('.wave-bar.active').forEach(b => b.classList.remove('active'));
+  const b = document.getElementById('wave-bar-' + idx);
+  if (b) b.classList.add('active');
+  if (!_data) return;
+  const segs = _data.segments;
+  const before = segs.slice(0, idx).reduce((a, r) => a + r.duration_sec, 0);
+  const totalDur = segs.reduce((a, r) => a + r.duration_sec, 0) || 1;
+  document.getElementById('wave-now-label').textContent =
+    `${segs[idx].segment_id} @ ${fmtDuration(before)}`;
+}
+
+// ── Segment cards ──────────────────────────────────────────────────────
+function renderSegments(segs) {
+  const list = document.getElementById('segments-list');
+  list.innerHTML = '';
+  let lastPhase = null;
+  segs.forEach((s, i) => {
+    if (s.phase !== lastPhase) {
+      const ps = phaseStyle(s.phase);
+      const d = document.createElement('div');
+      d.className = 'phase-divider';
+      d.style.color = ps.col;
+      d.innerHTML = `<span class="line" style="background:${ps.col}44"></span>${ps.label}<span class="line" style="background:${ps.col}11"></span>`;
+      list.appendChild(d);
+      lastPhase = s.phase;
+    }
+    const isOk = s.recommended_action === 'no_action';
+    const sev  = isOk ? 'seg-ok' : (s.recommended_action === 'pause_live_view' ? 'seg-spike' : 'seg-warn');
+    const card = document.createElement('div');
+    card.className = `seg-card ${sev}` + (isOk ? ' seg-efficient' : '');
+    card.id = 'seg-card-' + i;
+    card.dataset.idx = i;
+    const spike = (s.is_energy_spike && !isOk)
+      ? `<span class="pill pill-spike ml-1">⚡ +${s.spike_magnitude_w.toFixed(0)}W</span>` : '';
+    const savingsLbl = s.estimated_savings_wh > 0
+      ? `<span class="text-[11px] font-600" style="color:var(--ok)">Save ${s.estimated_savings_wh.toFixed(2)} Wh</span>`
+      : (isOk ? `<span class="t-faint text-[11px]">No action</span>`
+              : `<span class="text-[11px]" style="color:var(--warn)">Reduce waste</span>`);
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[12px] font-700 t-mono">${s.segment_id}</span>${spike}
+        </div>
+        <span class="t-faint text-[11px] t-mono whitespace-nowrap">
+          ${fmtDuration(s.duration_sec)} · ${s.avg_power_w.toFixed(0)}W · ${s.total_energy_wh.toFixed(2)}Wh
+        </span>
+      </div>
+      <div class="seg-details mt-2">
+        ${s.issue ? `<p class="text-[12px] leading-snug mt-1" style="color:var(--spike)">⚠ ${s.issue}</p>` : ''}
+        <div class="flex items-center justify-between mt-2 gap-2">
+          ${actionBadge(s.recommended_action)}
+          ${savingsLbl}
+        </div>
+      </div>`;
+    card.addEventListener('click', () => jumpToSegment(i));
+    list.appendChild(card);
+    _observer.observe(card);
+  });
+}
+
+function toggleEfficient(show) {
+  document.querySelectorAll('.seg-efficient').forEach(el => el.classList.toggle('collapsed', !show));
+}
+
+// ── Activate segment ───────────────────────────────────────────────────
+function activateSegment(idx) {
+  if (!_data) return;
+  const segs = _data.segments;
+  if (idx < 0 || idx >= segs.length) return;
+  _activeIdx = idx;
+  const s = segs[idx];
+
+  document.querySelectorAll('.seg-card.active').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById('seg-card-' + idx);
+  if (card) card.classList.add('active');
+
+  // Header
+  document.getElementById('rp-seg-id').textContent = s.segment_id;
+  const ps = phaseStyle(s.phase);
+  document.getElementById('rp-phase-badge').innerHTML =
+    `<span class="pill" style="color:${ps.col};border-color:${ps.col}44;background:${ps.col}14">${ps.label}</span>`;
+  document.getElementById('rp-position').textContent = `${idx + 1} / ${segs.length}`;
+
+  // Metrics
+  document.getElementById('rp-power').textContent = s.avg_power_w.toFixed(1) + ' W';
+  const vb = s.power_vs_baseline;
+  const vbEl = document.getElementById('rp-vs-baseline');
+  const showSpike = s.is_energy_spike && s.recommended_action !== 'no_action';
+  vbEl.textContent = (vb >= 0 ? '+' : '') + vb.toFixed(1) + ' W' + (showSpike ? ' ⚡' : '');
+  vbEl.style.color = showSpike ? 'var(--spike)' : (vb > 5 ? 'var(--warn)' : 'var(--ok)');
+  document.getElementById('rp-duration').textContent = fmtDuration(s.duration_sec);
+  document.getElementById('rp-energy').textContent = s.total_energy_wh.toFixed(3) + ' Wh';
+  document.getElementById('rp-live-view').textContent = Math.round(s.live_view_share * 100) + '%';
+  document.getElementById('rp-user-int').textContent = Math.round(s.user_interaction_share * 100) + '%';
+  document.getElementById('rp-overlap').textContent = s.overlap_pct.toFixed(1) + '%';
+  document.getElementById('rp-monitoring').textContent =
+    s.monitoring_required_share !== undefined ? Math.round(s.monitoring_required_share * 100) + '%' : '—';
+
+  // Why tab
+  const issue = document.getElementById('rp-issue-card');
+  const ok    = document.getElementById('rp-ok-card');
+  if (s.issue) {
+    issue.classList.remove('hidden'); ok.classList.add('hidden');
+    document.getElementById('rp-issue-text').textContent = s.issue;
+  } else {
+    issue.classList.add('hidden'); ok.classList.remove('hidden');
+  }
+  document.getElementById('rp-action-badge').innerHTML = actionBadge(s.recommended_action);
+  document.getElementById('rp-reason').textContent = s.action_reason || '—';
+  const conf = Math.round(s.confidence * 100);
+  document.getElementById('rp-conf-bar').style.width = conf + '%';
+  document.getElementById('rp-confidence-text').textContent = conf + '% confidence';
+  document.getElementById('rp-rule').textContent = s.rule_id ? `Rule ${s.rule_id}` : 'ML decision';
+
+  // Impact tab
+  const savEl = document.getElementById('rp-savings');
+  const note  = document.getElementById('rp-savings-note');
+  const imps  = buildImpact(s.estimated_savings_wh);
+  if (s.estimated_savings_wh > 0) {
+    savEl.textContent = '+' + s.estimated_savings_wh.toFixed(3) + ' Wh';
+    savEl.style.color = 'var(--ok)';
+    note.textContent = 'if the recommendation is applied';
+  } else {
+    savEl.textContent = '0 Wh';
+    savEl.style.color = 'var(--text-2)';
+    note.textContent = 'Already operating efficiently';
+  }
+  const ul = document.getElementById('rp-impact-list');
+  ul.innerHTML = imps.length
+    ? imps.map(it => `
+        <li class="flex items-center justify-between gap-3">
+          <span class="t-muted flex items-center gap-2"><span>${it.icon}</span>${it.label}</span>
+          <span class="t-mono font-600">${it.display}</span>
+        </li>`).join('')
+    : `<li class="t-faint">—</li>`;
+
+  updateWavePosition(idx);
+}
+
+function jumpToSegment(idx) {
+  if (!_data) return;
+  activateSegment(idx);
+  const card = document.getElementById('seg-card-' + idx);
+  if (card) {
+    if (card.classList.contains('collapsed')) card.classList.remove('collapsed');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── IntersectionObserver (scroll-based activation) ─────────────────────
+const _observer = new IntersectionObserver((entries) => {
+  if (_playInterval) return;
+  entries.forEach(entry => {
+    if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+      const idx = parseInt(entry.target.dataset.idx);
+      if (!isNaN(idx) && idx !== _activeIdx) activateSegment(idx);
+    }
+  });
+}, { threshold: 0.6, rootMargin: '-80px 0px 0px 0px' });
+
+// ── Play/stop ──────────────────────────────────────────────────────────
+document.getElementById('play-btn').addEventListener('click', startPlay);
+document.getElementById('stop-btn').addEventListener('click', stopPlay);
+function startPlay() {
+  if (!_data || _playInterval) return;
+  document.getElementById('play-btn').classList.add('hidden');
+  document.getElementById('stop-btn').classList.remove('hidden');
+  let pos = _visibleIdx.indexOf(_activeIdx);
+  _playInterval = setInterval(() => {
+    pos++;
+    if (pos >= _visibleIdx.length) { stopPlay(); return; }
+    jumpToSegment(_visibleIdx[pos]);
+  }, 1400);
+}
+function stopPlay() {
+  if (_playInterval) { clearInterval(_playInterval); _playInterval = null; }
+  document.getElementById('play-btn').classList.remove('hidden');
+  document.getElementById('stop-btn').classList.add('hidden');
+}
+
+// ── Inspector tabs ─────────────────────────────────────────────────────
+function setTab(name) {
+  document.querySelectorAll('[role="tab"]').forEach(t =>
+    t.setAttribute('aria-selected', t.dataset.tab === name ? 'true' : 'false'));
+  document.querySelectorAll('.tab-pane').forEach(p =>
+    p.classList.toggle('hidden', p.dataset.pane !== name));
+}
+document.querySelectorAll('[role="tab"]').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+
+// ── Copy summary / download ───────────────────────────────────────────
+document.getElementById('copy-report-btn').addEventListener('click', async () => {
+  if (!_data) return;
+  const v = verdict(_data);
+  const lines = [
+    `ZEISS Energy Atlas — ${_data.scenario_name}`,
+    v.headline, v.sub, '',
+    `Total energy:    ${_data.total_energy_wh.toFixed(2)} Wh`,
+    `Saveable:        ${_data.total_savings_wh.toFixed(2)} Wh (${_data.savings_pct.toFixed(1)}%)`,
+    `Segments:        ${_data.total_segments}`,
+    `Issues:          ${_data.issues_count}`,
+    `Energy spikes:   ${_data.spike_count}`,
+    `Model accuracy:  ${Math.round((_data.model_accuracy || 0) * 100)}%`,
+    `Model F1:        ${Math.round((_data.model_f1 || 0) * 100)}%`,
+  ];
+  try { await navigator.clipboard.writeText(lines.join('\n')); toast('Summary copied to clipboard'); }
+  catch { toast('Clipboard unavailable'); }
+});
+document.getElementById('download-btn').addEventListener('click', () => {
+  if (!_data) return;
+  const blob = new Blob([JSON.stringify(_data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = (_data.scenario_name || 'workflow') + '_analysis.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  toast('Downloaded JSON');
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────
+let _toastT;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Prev / next buttons ───────────────────────────────────────────────
+document.getElementById('prev-seg').addEventListener('click', () => stepSegment(-1));
+document.getElementById('next-seg').addEventListener('click', () => stepSegment(1));
+function stepSegment(dir) {
+  if (!_data) return;
+  const pos = _visibleIdx.indexOf(_activeIdx);
+  const next = Math.max(0, Math.min(_visibleIdx.length - 1, pos + dir));
+  jumpToSegment(_visibleIdx[next]);
+}
+
+// ── Help overlay ───────────────────────────────────────────────────────
+function toggleHelp(force) {
+  const o = document.getElementById('help-overlay');
+  const show = force !== undefined ? force : o.classList.contains('hidden');
+  o.classList.toggle('hidden', !show);
+  o.classList.toggle('flex', show);
+}
+document.getElementById('help-btn').addEventListener('click', () => toggleHelp(true));
+document.getElementById('help-overlay').addEventListener('click', e => {
+  if (e.target.id === 'help-overlay') toggleHelp(false);
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+  if (e.key === 'Escape') { toggleHelp(false); stopPlay(); return; }
+  if (e.key === '?' || (e.shiftKey && e.key === '/')) { toggleHelp(); e.preventDefault(); return; }
+  if (e.key === 't' || e.key === 'T') {
+    const isDark = document.documentElement.classList.contains('dark');
+    applyTheme(isDark ? 'light' : 'dark'); return;
+  }
+  if (!_data) return;
+  switch (e.key) {
+    case 'ArrowDown': case 'j': stepSegment(1);  e.preventDefault(); break;
+    case 'ArrowUp':   case 'k': stepSegment(-1); e.preventDefault(); break;
+    case ' ':                   _playInterval ? stopPlay() : startPlay(); e.preventDefault(); break;
+    case '1': setTab('metrics'); break;
+    case '2': setTab('why');     break;
+    case '3': setTab('impact');  break;
+    case 'a': setFilter('all');     break;
+    case 'i': setFilter('issues');  break;
+    case 's': setFilter('spikes');  break;
+    case 'o': setFilter('ok');      break;
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function fmtDuration(sec) {
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60), s = sec % 60;
+  if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60), mm = m % 60;
+  return mm ? `${h}h ${mm}m` : `${h}h`;
+}
+</script>
+</body>
+</html>

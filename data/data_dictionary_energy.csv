@@ -1,0 +1,62 @@
+field_name,level,type,description,expected_values_or_units,why_it_matters
+session_id,raw,string,Synthetic session identifier.,text,Useful for grouping rows that belong to the same run.
+timestamp,raw,datetime,Observation timestamp for each telemetry row.,YYYY-MM-DD HH:MM:SS,Used to reconstruct chronology and segment timing.
+sample_interval_sec,raw,integer,Sampling interval represented by the row.,seconds,Lets teams convert row counts into duration or energy totals.
+workflow_block_id,raw,integer,Synthetic workflow block counter from the generator.,positive integer,Useful as a hint only; do not assume it always equals the final phase segment.
+workflow_phase,raw,categorical,Declared workflow phase for the row.,tile_scan_acquisition; live_view_monitoring; processing; idle,Primary grouping variable for segment-based analysis.
+experiment_type,raw,categorical,Synthetic experiment mode running at that moment.,tile_scan; overview_scan; alignment_check; time_lapse; reconstruction_only; none,Helps explain why some high-load periods may be expected.
+quality_constraint,raw,categorical,Requested quality level.,low; medium; high,Important when judging whether optimization is acceptable.
+experiment_running_flag,raw,boolean,Whether an experiment is actively running.,0/1 or FALSE/TRUE,Separates active acquisition from passive states.
+monitoring_required_flag,raw,boolean,Whether continuous monitoring is considered necessary.,0/1 or FALSE/TRUE,Key guardrail for deciding whether live view can be paused.
+live_view_enabled_flag,raw,boolean,Whether live view / preview is currently enabled.,0/1 or FALSE/TRUE,Main signal behind pause_live_view recommendations.
+continuous_acquisition_display_flag,raw,boolean,Whether acquisition is continuously displayed during runtime.,0/1 or FALSE/TRUE,Helpful secondary signal for display-related overhead.
+tile_scan_enabled_flag,raw,boolean,Whether a tile scan is active.,0/1 or FALSE/TRUE,Useful when evaluating scan optimization opportunities.
+user_interacting_flag,raw,boolean,Whether the user is currently interacting with the system.,0/1 or FALSE/TRUE,Low interaction plus live view often indicates waste.
+seconds_since_last_ui_interaction,raw,numeric,Time since last user interaction.,seconds,A stronger inactivity measure than the instantaneous interaction flag.
+tile_count_x,raw,integer,Tile count along x-axis.,count,Part of scan size and data burden.
+tile_count_y,raw,integer,Tile count along y-axis.,count,Part of scan size and data burden.
+tile_overlap_pct,raw,numeric,Tile overlap percentage.,percent,High overlap can indicate avoidable scan overhead.
+planned_scan_area_mm2,raw,numeric,Planned scan area.,mm²,Large areas can justify higher throughput or power draw.
+preview_resolution_pct,raw,numeric,Preview resolution setting.,percent,May help explain display and data volume load.
+camera_light_usage_index_pct,raw,numeric,Synthetic relative camera/light usage index.,percent,Proxy for acquisition intensity.
+perf_cpu_pct,raw,numeric,Observed CPU utilization.,percent,Helps distinguish compute-heavy processing from lighter phases.
+perf_gpu_usage_pct,raw,numeric,Observed GPU utilization.,percent,Useful in processing and visualization segments.
+perf_gpu_power_w,raw,numeric,Observed GPU power draw.,watts,Strong indicator of visualization or reconstruction load.
+perf_disk_write_mb_s,raw,numeric,Disk write throughput.,MB/s,Helps detect acquisition-heavy or data-heavy periods.
+perf_incoming_data_mb_s,raw,numeric,Incoming data throughput.,MB/s,Helpful when diagnosing scan burden.
+processing_items_in_flight,raw,numeric,Synthetic measure of active processing work.,count-like index,Useful for justifying high compute during processing phases.
+estimated_system_power_w,raw,numeric,Estimated total system power draw.,watts,Main energy signal.
+estimated_energy_wh_interval,raw,numeric,Estimated energy consumed over the row interval.,Wh,Lets teams compare cumulative energy between segments.
+recommended_action,raw_training_only,categorical,Training label for the row.,pause_live_view; optimize_tile_scan_settings; no_action,Use as a learning signal in training scenarios only.
+scenario_code,segment,string,Scenario code.,"S1, S2, ...",Keeps submissions traceable to a scenario.
+scenario_name,segment,string,Human-readable scenario title.,text,Useful for presentations and tables.
+phase_segment_id,segment,string,Segment identifier derived from contiguous workflow_phase runs.,S13_P001 etc.,This is the key identifier for the submission file.
+phase_name,segment,categorical,Phase assigned to the segment.,same 4 phase values as raw,Teams submit one row per segment.
+start_row_index,segment,integer,First raw-row index included in the segment.,0-based row index,Lets teams jump back to the raw data.
+end_row_index,segment,integer,Last raw-row index included in the segment.,0-based row index,Lets teams jump back to the raw data.
+start_timestamp,segment,datetime,Timestamp of first row in the segment.,YYYY-MM-DD HH:MM:SS,Helps explain chronology.
+end_timestamp,segment,datetime,Timestamp of last row in the segment.,YYYY-MM-DD HH:MM:SS,Helps explain chronology.
+duration_sec,segment,integer,Total represented duration of the segment.,seconds,Simple proxy for exposure time.
+n_rows,segment,integer,Number of raw rows collapsed into the segment.,count,Useful for understanding granularity.
+experiment_type_mode,segment,categorical,Most common experiment_type inside the segment.,see raw field values,Context feature.
+quality_constraint_mode,segment,categorical,Most common quality constraint inside the segment.,low; medium; high,Context feature.
+monitoring_required_share,segment,numeric,Share of rows where monitoring was required.,0 to 1,High values should discourage pause_live_view.
+live_view_enabled_share,segment,numeric,Share of rows with live view enabled.,0 to 1,High values plus low interaction can indicate waste.
+user_interacting_share,segment,numeric,Share of rows with active user interaction.,0 to 1,Low values indicate unattended periods.
+median_seconds_since_last_ui_interaction,segment,numeric,Median inactivity duration within the segment.,seconds,Robust inactivity signal.
+tile_count_x_max,segment,integer,Maximum x tile count in the segment.,count,Helps interpret scan scale.
+tile_count_y_max,segment,integer,Maximum y tile count in the segment.,count,Helps interpret scan scale.
+tile_overlap_pct_mean,segment,numeric,Mean overlap percentage within the segment.,percent,Important for optimize_tile_scan_settings.
+planned_scan_area_mm2_mean,segment,numeric,Mean scan area within the segment.,mm²,Helps distinguish large scans from small ones.
+preview_resolution_pct_mean,segment,numeric,Mean preview resolution in the segment.,percent,Secondary complexity signal.
+camera_light_usage_index_pct_mean,segment,numeric,Mean camera/light usage index.,percent,Proxy for acquisition intensity.
+perf_cpu_pct_mean,segment,numeric,Mean CPU utilization.,percent,Processing context.
+perf_gpu_usage_pct_mean,segment,numeric,Mean GPU utilization.,percent,Processing/visualization context.
+perf_gpu_power_w_mean,segment,numeric,Mean GPU power draw.,watts,Useful energy feature.
+perf_disk_write_mb_s_mean,segment,numeric,Mean disk write throughput.,MB/s,Scan/data-load signal.
+perf_incoming_data_mb_s_mean,segment,numeric,Mean incoming data throughput.,MB/s,Scan/data-load signal.
+processing_items_in_flight_mean,segment,numeric,Mean processing-items indicator.,count-like index,Processing context.
+estimated_system_power_w_mean,segment,numeric,Mean total power draw across the segment.,watts,Main power score at segment level.
+estimated_energy_wh_interval_sum,segment,numeric,Total estimated energy consumed by the segment.,Wh,Useful for ranking high-cost segments.
+recommended_action,segment_training_only,categorical,Majority row-level action label inside the training segment.,pause_live_view; optimize_tile_scan_settings; no_action,Training-only target for segment-based approaches; column name matches the submission template.
+label_consensus_pct,segment_training_only,numeric,Share of rows supporting the majority action label.,0 to 100,Helps reveal ambiguous training segments.
